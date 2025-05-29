@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
+
 import { useChatStore } from "@/lib/store/chatStore";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 const ChatApp = () => {
   const [socket, setSocket] = useState(null);
@@ -19,7 +22,7 @@ const ChatApp = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // Initialize socket connection
+  // Socket.io setup
   useEffect(() => {
     const newSocket = io("http://localhost:5000", {
       transports: ["websocket", "polling"],
@@ -29,231 +32,109 @@ const ChatApp = () => {
 
     setSocket(newSocket);
 
-    // Connection events
-    newSocket.on("connect", () => {
-      console.log("Connected to server with ID:", newSocket.id);
-      setIsConnected(true);
-    });
+    newSocket.on("connect", () => setIsConnected(true));
+    newSocket.on("disconnect", () => setIsConnected(false));
+    newSocket.on("connect_error", () => setIsConnected(false));
 
-    newSocket.on("disconnect", (reason) => {
-      console.log("Disconnected from server:", reason);
-      setIsConnected(false);
-    });
-
-    newSocket.on("connect_error", (error) => {
-      console.error("Connection error:", error);
-      setIsConnected(false);
-    });
-
-    // Chat events
-    newSocket.on("newMessage", (message) => {
-      console.log("New message received:", message);
-      addMessage(message);
-    });
-
-    newSocket.on("messageHistory", (history) => {
-      console.log("Message history received:", history);
-      setMessages(history);
-    });
+    newSocket.on("newMessage", (message) => addMessage(message));
+    newSocket.on("messageHistory", (history) => setMessages(history));
 
     newSocket.on("userJoined", (username) => {
-      console.log("User joined:", username);
-      const joinMessage = {
+      addMessage({
         id: Date.now() + Math.random(),
         username: "System",
         text: `${username} joined the chat`,
         timestamp: new Date().toLocaleTimeString(),
-      };
-      addMessage(joinMessage);
+      });
     });
 
     newSocket.on("userLeft", (username) => {
-      console.log("User left:", username);
-      const leaveMessage = {
+      addMessage({
         id: Date.now() + Math.random(),
         username: "System",
         text: `${username} left the chat`,
         timestamp: new Date().toLocaleTimeString(),
-      };
-      addMessage(leaveMessage);
-    });
-
-    newSocket.on("userList", (userList) => {
-      console.log("User list updated:", userList);
-      setUsers(userList);
-    });
-
-    newSocket.on("userTyping", (username) => {
-      setTypingUsers((prev) => {
-        if (!prev.includes(username)) {
-          return [...prev, username];
-        }
-        return prev;
       });
     });
 
-    newSocket.on("userStoppedTyping", (username) => {
-      setTypingUsers((prev) => prev.filter((user) => user !== username));
+    newSocket.on("userList", setUsers);
+    newSocket.on("userTyping", (name) => {
+      setTypingUsers((prev) => (prev.includes(name) ? prev : [...prev, name]));
     });
+    newSocket.on("userStoppedTyping", (name) =>
+      setTypingUsers((prev) => prev.filter((u) => u !== name)),
+    );
 
-    return () => {
-      console.log("Cleaning up socket connection");
-      newSocket.close();
-    };
+    return () => newSocket.close();
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  // Join chat function
   const handleJoin = () => {
     if (socket && username.trim()) {
-      console.log("Joining chat as:", username);
       socket.emit("join", username);
       setIsJoined(true);
     }
   };
 
-  // Send message function
   const handleSendMessage = () => {
     if (socket && inputMessage.trim() && isJoined) {
-      console.log("Sending message:", inputMessage);
-      socket.emit("sendMessage", {
-        text: inputMessage,
-      });
+      socket.emit("sendMessage", { text: inputMessage });
       setInputMessage("");
-
-      // Stop typing indicator
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.emit("stopTyping");
     }
   };
 
-  // Handle typing
   const handleTyping = () => {
     if (socket && isJoined) {
       socket.emit("typing");
-
-      // Clear existing timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      // Set new timeout to stop typing indicator
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("stopTyping");
       }, 2000);
     }
   };
 
-  // Handle Enter key press
   const handleKeyPress = (e: { key: string }) => {
     if (e.key === "Enter") {
-      if (!isJoined) {
-        handleJoin();
-      } else {
-        handleSendMessage();
-      }
+      isJoined ? handleSendMessage() : handleJoin();
     }
   };
 
   // Join screen
   if (!isJoined) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: "#f3f4f6",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: "white",
-            padding: "2rem",
-            borderRadius: "8px",
-            boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-            width: "100%",
-            maxWidth: "400px",
-            color: "#000",
-          }}
-        >
-          <h1
-            style={{
-              textAlign: "center",
-              marginBottom: "1.5rem",
-              color: "#1f2937",
-            }}
-          >
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 font-sans">
+        <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-black">
+          <h1 className="text-center text-xl font-semibold mb-6 text-gray-800">
             Join Chat Room
           </h1>
-
-          <div style={{ marginBottom: "1rem" }}>
-            <input
+          <div className="mb-4">
+            <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Enter your username"
-              style={{
-                width: "100%",
-                padding: "0.75rem",
-                border: "1px solid #d1d5db",
-                borderRadius: "4px",
-                fontSize: "1rem",
-                outline: "none",
-                boxSizing: "border-box",
-              }}
             />
           </div>
-
-          <button
+          <Button
             onClick={handleJoin}
             disabled={!username.trim() || !isConnected}
-            style={{
-              width: "100%",
-              padding: "0.75rem",
-              backgroundColor: isConnected ? "#3b82f6" : "#9ca3af",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "1rem",
-              cursor: isConnected ? "pointer" : "not-allowed",
-            }}
+            className="w-full"
           >
             {isConnected ? "Join Chat" : "Connecting..."}
-          </button>
-
-          <div
-            style={{
-              marginTop: "1rem",
-              textAlign: "center",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-            }}
-          >
+          </Button>
+          <div className="mt-4 text-center flex items-center justify-center gap-2">
             <div
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                backgroundColor: isConnected ? "#10b981" : "#ef4444",
-              }}
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
             ></div>
-            <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+            <span className="text-sm text-gray-500">
               {isConnected ? "Connected to server" : "Disconnected"}
             </span>
           </div>
@@ -262,63 +143,26 @@ const ChatApp = () => {
     );
   }
 
-  // Main chat interface
+  // Chat UI
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        backgroundColor: "#f3f4f6",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
+    <div className="min-h-screen flex bg-gray-100 font-sans">
       {/* Sidebar */}
-      <div
-        style={{
-          width: "250px",
-          backgroundColor: "white",
-          borderRight: "1px solid #e5e7eb",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div
-          style={{
-            padding: "1rem",
-            borderBottom: "1px solid #e5e7eb",
-            backgroundColor: "#f9fafb",
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: "1.125rem", color: "#1f2937" }}>
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg text-gray-800">
             👥 Online Users ({users.length})
           </h2>
         </div>
-
-        <div style={{ padding: "1rem", flex: 1 }}>
-          {users.map((user, index) => (
-            <div
-              key={index}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                marginBottom: "0.5rem",
-              }}
-            >
-              <div
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  backgroundColor: "#10b981",
-                }}
-              ></div>
+        <div className="p-4 flex-1">
+          {users.map((user, idx) => (
+            <div key={idx} className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
               <span
-                style={{
-                  fontSize: "0.875rem",
-                  fontWeight: user === username ? "bold" : "normal",
-                  color: user === username ? "#3b82f6" : "#374151",
-                }}
+                className={`text-sm ${
+                  user === username
+                    ? "font-bold text-blue-600"
+                    : "text-gray-700"
+                }`}
               >
                 {user} {user === username && "(you)"}
               </span>
@@ -327,23 +171,11 @@ const ChatApp = () => {
         </div>
       </div>
 
-      {/* Main chat area */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      {/* Chat */}
+      <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div
-          style={{
-            backgroundColor: "white",
-            padding: "1rem",
-            borderBottom: "1px solid #e5e7eb",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h1 style={{ margin: 0, fontSize: "1.25rem", color: "#1f2937" }}>
-            💬 Fortect Chat
-          </h1>
-
+        <div className="bg-white p-4 border-b border-gray-200 flex items-center justify-between">
+          <h1 className="text-xl text-gray-800">💬 Fortect Chat</h1>
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
@@ -353,85 +185,49 @@ const ChatApp = () => {
             <span className="text-sm text-gray-500">
               {isConnected ? "Connected" : "Disconnected"}
             </span>
-
-            {/* Logout button */}
-            <button
+            <Button
               onClick={() => {
-                if (socket) {
-                  socket.disconnect();
-                  setSocket(null);
-                }
+                socket?.disconnect();
+                setSocket(null);
                 resetStore();
                 setUsername("");
                 setIsJoined(false);
               }}
-              className="ml-4 px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition"
+              className="ml-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-sm rounded transition"
             >
               Logout
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Messages */}
-        <div
-          style={{
-            flex: 1,
-            overflow: "auto",
-            padding: "1rem",
-            backgroundColor: "#ffffff",
-          }}
-        >
+        <div className="flex-1 overflow-auto p-4 bg-white">
           {messages.map((message) => (
             <div
               key={message.id}
-              style={{
-                marginBottom: "1rem",
-                display: "flex",
-                justifyContent:
-                  message.username === username ? "flex-end" : "flex-start",
-              }}
+              className={`mb-4 flex ${
+                message.username === username ? "justify-end" : "justify-start"
+              }`}
             >
               <div
-                style={{
-                  maxWidth: "70%",
-                  padding: "0.75rem",
-                  borderRadius: "8px",
-                  backgroundColor: message?.username?.startsWith("Bot-")
-                    ? "#d1fae5" // light green
-                    : message.username === username
-                      ? "#3b82f6"
-                      : message.username === "System"
-                        ? "#fef3c7"
-                        : "#f3f4f6",
-                  color:
-                    message.username === username
-                      ? "white"
-                      : message.username === "System"
-                        ? "#92400e"
-                        : "#1f2937",
-                }}
+                className={`max-w-[70%] p-3 rounded-lg text-sm ${
+                  message.username === "System"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : message.username.startsWith("Bot-")
+                      ? "bg-green-100 text-gray-800"
+                      : message.username === username
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-800"
+                }`}
               >
                 {message.username !== username &&
                   message.username !== "System" && (
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: "bold",
-                        marginBottom: "0.25rem",
-                        color: "#6b7280",
-                      }}
-                    >
+                    <div className="text-xs font-bold text-gray-500 mb-1">
                       {message.username}
                     </div>
                   )}
-                <div style={{ fontSize: "0.875rem" }}>{message.text}</div>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    marginTop: "0.25rem",
-                    opacity: 0.7,
-                  }}
-                >
+                <div>{message.text}</div>
+                <div className="text-xs mt-1 opacity-70">
                   {message.timestamp}
                 </div>
               </div>
@@ -439,14 +235,7 @@ const ChatApp = () => {
           ))}
 
           {typingUsers.length > 0 && (
-            <div
-              style={{
-                fontSize: "0.875rem",
-                color: "#6b7280",
-                fontStyle: "italic",
-                marginBottom: "1rem",
-              }}
-            >
+            <div className="text-sm text-gray-500 italic mb-4">
               {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"}{" "}
               typing...
             </div>
@@ -455,16 +244,10 @@ const ChatApp = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Message input */}
-        <div
-          style={{
-            backgroundColor: "white",
-            borderTop: "1px solid #e5e7eb",
-            padding: "1rem",
-          }}
-        >
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <input
+        {/* Input */}
+        <div className="bg-white border-t border-gray-200 p-4">
+          <div className="flex gap-2">
+            <Input
               type="text"
               value={inputMessage}
               onChange={(e) => {
@@ -473,35 +256,14 @@ const ChatApp = () => {
               }}
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
-              style={{
-                flex: 1,
-                padding: "0.75rem",
-                border: "1px solid #d1d5db",
-                borderRadius: "4px",
-                fontSize: "1rem",
-                outline: "none",
-                color: "#374151",
-              }}
             />
-            <button
+            <Button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || !isConnected}
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor:
-                  isConnected && inputMessage.trim() ? "#3b82f6" : "#9ca3af",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "1rem",
-                cursor:
-                  isConnected && inputMessage.trim()
-                    ? "pointer"
-                    : "not-allowed",
-              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Send
-            </button>
+            </Button>
           </div>
         </div>
       </div>
