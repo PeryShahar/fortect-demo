@@ -118,13 +118,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-html,
-body {
-  background-color: black;
-  background-image: linear-gradient(to bottom right, #2a003d, #66004d, #7f3b00);
-  background-attachment: fixed;
-  background-size: cover;
-  color: white;
-  font-family: sans-serif;
-}
