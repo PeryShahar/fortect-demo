@@ -4,7 +4,7 @@ import helmet from "helmet";
 import http from "http";
 import { Server } from "socket.io";
 
-import { setupSocketHandlers } from "./config/socket";
+import { setupSocketHandlers } from "./socket/socketHandlers";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
