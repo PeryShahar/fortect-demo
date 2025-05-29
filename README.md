@@ -38,3 +38,8 @@ npm run dev:frontend
 ```bash
 npm run dev:backend
 ```
+
+<img width="911" alt="Screenshot 2025-05-29 at 11 25 30" src="https://github.com/user-attachments/assets/4785026d-4630-48bf-b55d-e41e79bc14af" />
+<img width="910" alt="Screenshot 2025-05-29 at 11 25 37" src="https://github.com/user-attachments/assets/a93eb3a2-2266-4b56-8687-32dec4436d22" />
+
+
