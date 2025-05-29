@@ -387,8 +387,9 @@ const ChatApp = () => {
                   maxWidth: "70%",
                   padding: "0.75rem",
                   borderRadius: "8px",
-                  backgroundColor:
-                    message.username === username
+                  backgroundColor: message.username.startsWith("Bot-")
+                    ? "#d1fae5" // light green
+                    : message.username === username
                       ? "#3b82f6"
                       : message.username === "System"
                         ? "#fef3c7"
