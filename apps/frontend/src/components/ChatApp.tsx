@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
+import { useChatStore } from "@/lib/store/chatStore";
 
 const ChatApp = () => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-
-  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
   const [username, setUsername] = useState("");
   const [isJoined, setIsJoined] = useState(false);
   const [users, setUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
+
+  const messages = useChatStore((state) => state.messages);
+  const addMessage = useChatStore((state) => state.addMessage);
+  const setMessages = useChatStore((state) => state.setMessages);
+  const resetStore = useChatStore((state) => state.reset);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -22,7 +26,6 @@ const ChatApp = () => {
       upgrade: true,
       rememberUpgrade: true,
     });
-    console.log("newSocket: ", newSocket);
 
     setSocket(newSocket);
 
@@ -45,7 +48,7 @@ const ChatApp = () => {
     // Chat events
     newSocket.on("newMessage", (message) => {
       console.log("New message received:", message);
-      setMessages((prev) => [...prev, message]);
+      addMessage(message);
     });
 
     newSocket.on("messageHistory", (history) => {
@@ -61,7 +64,7 @@ const ChatApp = () => {
         text: `${username} joined the chat`,
         timestamp: new Date().toLocaleTimeString(),
       };
-      setMessages((prev) => [...prev, joinMessage]);
+      addMessage(joinMessage);
     });
 
     newSocket.on("userLeft", (username) => {
@@ -72,7 +75,7 @@ const ChatApp = () => {
         text: `${username} left the chat`,
         timestamp: new Date().toLocaleTimeString(),
       };
-      setMessages((prev) => [...prev, leaveMessage]);
+      addMessage(leaveMessage);
     });
 
     newSocket.on("userList", (userList) => {
@@ -93,7 +96,6 @@ const ChatApp = () => {
       setTypingUsers((prev) => prev.filter((user) => user !== username));
     });
 
-    // Cleanup on unmount
     return () => {
       console.log("Cleaning up socket connection");
       newSocket.close();
@@ -339,27 +341,34 @@ const ChatApp = () => {
           }}
         >
           <h1 style={{ margin: 0, fontSize: "1.25rem", color: "#1f2937" }}>
-            💬 React + Socket.io Chat
+            💬 Fortect Chat
           </h1>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-            }}
-          >
+          <div className="flex items-center gap-2">
             <div
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                backgroundColor: isConnected ? "#10b981" : "#ef4444",
-              }}
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
             ></div>
-            <span style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+            <span className="text-sm text-gray-500">
               {isConnected ? "Connected" : "Disconnected"}
             </span>
+
+            {/* Logout button */}
+            <button
+              onClick={() => {
+                if (socket) {
+                  socket.disconnect();
+                  setSocket(null);
+                }
+                resetStore();
+                setUsername("");
+                setIsJoined(false);
+              }}
+              className="ml-4 px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition"
+            >
+              Logout
+            </button>
           </div>
         </div>
 
@@ -387,7 +396,7 @@ const ChatApp = () => {
                   maxWidth: "70%",
                   padding: "0.75rem",
                   borderRadius: "8px",
-                  backgroundColor: message.username.startsWith("Bot-")
+                  backgroundColor: message?.username?.startsWith("Bot-")
                     ? "#d1fae5" // light green
                     : message.username === username
                       ? "#3b82f6"
