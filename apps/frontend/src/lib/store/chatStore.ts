@@ -8,13 +8,11 @@ export interface Message {
 }
 
 interface ChatState {
-  username: string;
   isJoined: boolean;
   isConnected: boolean;
   messages: Message[];
   users: string[];
   typingUsers: string[];
-  setUsername: (name: string) => void;
   setIsJoined: (joined: boolean) => void;
   setIsConnected: (connected: boolean) => void;
   addMessage: (msg: Message) => void;
@@ -26,13 +24,11 @@ interface ChatState {
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  username: "",
   isJoined: false,
   isConnected: false,
   messages: [],
   users: [],
   typingUsers: [],
-  setUsername: (name) => set({ username: name }),
   setIsJoined: (joined) => set({ isJoined: joined }),
   setIsConnected: (connected) => set({ isConnected: connected }),
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
@@ -51,7 +47,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   reset: () =>
     set({
-      username: "",
       isJoined: false,
       isConnected: false,
       messages: [],
